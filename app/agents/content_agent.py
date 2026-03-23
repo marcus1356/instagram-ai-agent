@@ -1,9 +1,11 @@
 """
-Content Agent — usa Claude para gerar a legenda ideal e os hashtags
+Content Agent — usa OpenAI GPT para gerar a legenda ideal e os hashtags
 para um post de cultura pop no Instagram.
 """
 
-import anthropic
+import json
+
+from openai import OpenAI
 
 from app.core.config import settings
 
@@ -38,7 +40,7 @@ def generate_post_content(topic: str) -> dict:
     Gera legenda, hashtags e prompt de imagem para um tópico.
     Retorna dict com: caption, hashtags, image_prompt
     """
-    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+    client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
     user_message = f"""Crie um post viral para o Instagram sobre este trending topic de cultura pop:
 
@@ -46,14 +48,19 @@ Tópico: {topic}
 
 Lembre-se: retorne APENAS o JSON, sem markdown, sem explicações."""
 
-    message = client.messages.create(
-        model="claude-sonnet-4-6",
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
         max_tokens=1024,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": user_message}],
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_message},
+        ],
     )
 
-    raw = message.content[0].text.strip()
-
-    import json
-    return json.loads(raw)
+    raw = response.choices[0].message.content.strip()
+    # Remove markdown code blocks if present
+    if raw.startswith("```"):
+        raw = raw.split("```")[1]
+        if raw.startswith("json"):
+            raw = raw[4:]
+    return json.loads(raw.strip())

@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str
 
     # OpenAI (DALL-E)
-    OPENAI_API_KEY: str
+    OPENAI_API_KEY: str = ""
 
     # Scheduler
     POST_HOUR: int = 9       # hora do post diário (9h)
