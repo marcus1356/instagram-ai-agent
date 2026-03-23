@@ -1,11 +1,18 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.templating import Jinja2Templates
+from sqlalchemy import func, select
 
 from app.api.posts import router as posts_router
 from app.core.config import settings
-from app.core.database import create_tables
+from app.core.database import AsyncSessionLocal, create_tables
+from app.models.post import Post, PostStatus
+
+TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 
 @asynccontextmanager
@@ -32,12 +39,26 @@ app.include_router(posts_router)
 
 
 @app.get("/")
-async def root():
-    return {
-        "app": settings.APP_NAME,
-        "status": "running",
-        "docs": "/docs",
-    }
+async def dashboard(request: Request):
+    """Dashboard visual — lista todos os posts gerados."""
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(Post).order_by(Post.created_at.desc()))
+        posts = result.scalars().all()
+
+        total = len(posts)
+        ready = sum(1 for p in posts if p.status == PostStatus.READY)
+        posted = sum(1 for p in posts if p.status == PostStatus.POSTED)
+
+    return templates.TemplateResponse(
+        "dashboard.html",
+        {
+            "request": request,
+            "posts": posts,
+            "total": total,
+            "ready": ready,
+            "posted": posted,
+        },
+    )
 
 
 @app.get("/health")
